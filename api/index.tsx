@@ -5,18 +5,17 @@ import { handle } from 'frog/vercel';
 import axios from 'axios';
 import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? 'default-api-key';
 const CAST_ID = process.env.CAST_ID;
 const FARCASTER_API_URL = 'https://api.farcaster.xyz/v1/reactions';  // Adjust for correct endpoint
 
-// Check if the user has liked or recast the cast
 async function checkReactions(fid: string): Promise<boolean> {
   try {
     const response = await axios.post(FARCASTER_API_URL, {
       id: {
         message_id: CAST_ID,
       },
-      type: 'LIKE',  // and 'RECAST'
+      type: 'LIKE',  // or 'RECAST'
     }, {
       headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
     });
@@ -44,7 +43,8 @@ app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
 
-  const fid = hub?.interactor?.fid;  // Get user fid from context
+  // Debugging: Log the full context
+  console.log(c);  // Check if the 'fid' is present in the context
 
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
@@ -70,6 +70,8 @@ app.frame('/', async (c) => {
       ],
     });
   }
+
+  const fid = hub?.interactor?.fid || 'test-fid';  // Fallback for testing purposes
 
   if (fid) {
     const hasReacted = await checkReactions(fid);
