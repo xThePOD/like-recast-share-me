@@ -9,6 +9,7 @@ const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36
 const CAST_ID = process.env.CAST_ID;
 const FARCASTER_API_URL = 'https://api.farcaster.xyz/v1/reactions';  // Adjust for correct endpoint
 
+// Check if the user has liked and recasted the cast
 async function checkReactions(fid: string): Promise<boolean> {
   try {
     const response = await axios.post(FARCASTER_API_URL, {
@@ -33,7 +34,7 @@ async function checkReactions(fid: string): Promise<boolean> {
 export const app = new Frog({
   assetsPath: '/',
   basePath: '/api',
-  title: 'Two Frame Example with Reaction Check',
+  title: 'Check Reactions Before Welcome',
 }).use(neynar({
   apiKey: NEYNAR_API_KEY,
   features: ['interactor'],
@@ -43,9 +44,7 @@ app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
 
-  // Debugging: Log the full context
-  console.log(c);  // Check if the 'fid' is present in the context
-
+  // If the user presses "Enter"
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
       image: (
@@ -61,7 +60,7 @@ app.frame('/', async (c) => {
           width: '100%',
         }}>
           <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
-            Enter
+            Press Enter
           </div>
         </div>
       ),
@@ -71,12 +70,13 @@ app.frame('/', async (c) => {
     });
   }
 
-  const fid = hub?.interactor?.fid || 'test-fid';  // Fallback for testing purposes
+  const fid = hub?.interactor?.fid;  // Get the Farcaster user ID (fid)
 
   if (fid) {
     const hasReacted = await checkReactions(fid);
 
     if (hasReacted) {
+      // If the user has liked and recasted, show the "Welcome to the POD" message
       return c.res({
         image: (
           <div style={{
@@ -91,12 +91,13 @@ app.frame('/', async (c) => {
             width: '100%',
           }}>
             <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
-              Welcome to the Pod!
+              Welcome to the POD!
             </div>
           </div>
         ),
       });
     } else {
+      // If the user hasn't liked and recasted, prompt them to do so
       return c.res({
         image: (
           <div style={{
@@ -111,13 +112,13 @@ app.frame('/', async (c) => {
             width: '100%',
           }}>
             <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
-              Please like and recast to enter!
+              Please like and recast the cast to enter!
             </div>
           </div>
         ),
         intents: [
           <Button.Link href={`https://warpcast.com/~/cast/${CAST_ID}`}>Like and Recast</Button.Link>,
-          <Button value="enter">Try Again</Button>,
+          <Button value="enter">Try Again</Button>,  // Retry checking interactions
         ],
       });
     }
