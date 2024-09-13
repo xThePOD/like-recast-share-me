@@ -5,12 +5,39 @@ import { handle } from 'frog/vercel';
 import { neynar } from 'frog/middlewares';
 
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
-const CAST_ID = process.env.CAST_ID;
+const CAST_ID = process.env.CAST_ID ?? 'your-cast-id';
+const USER_FOLLOWER_ID = process.env.FOLLOW_ID ?? 'your-follow-id';
+
+// Check if the user has liked, recasted, and followed the cast using Neynar API
+async function checkInteractions(fid: string): Promise<boolean> {
+  try {
+    const response = await fetch(`https://api.neynar.com/v2/farcaster/cast?identifier=${CAST_ID}&type=hash`, {
+      headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
+    });
+    const data = await response.json();
+
+    const cast = data.cast;
+    const hasLiked = cast.reactions.likes.some((like: any) => like.fid === fid);
+    const hasRecasted = cast.reactions.recasts.some((recast: any) => recast.fid === fid);
+
+    // Check if the user follows a certain account (Optional)
+    const followResponse = await fetch(`https://api.neynar.com/v2/farcaster/following/${fid}`, {
+      headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
+    });
+    const followData = await followResponse.json();
+    const hasFollowed = followData.following.some((follow: any) => follow.fid === USER_FOLLOWER_ID);
+
+    return hasLiked && hasRecasted && hasFollowed;
+  } catch (error) {
+    console.error('Error checking interactions:', error);
+    return false;
+  }
+}
 
 export const app = new Frog({
   assetsPath: '/',
   basePath: '/api',
-  title: 'Check Reactions and Automate with Neynar SDK',
+  title: 'Check Interactions and Proceed to Welcome',
 }).use(neynar({
   apiKey: NEYNAR_API_KEY,
   features: ['interactor'],
@@ -19,9 +46,9 @@ export const app = new Frog({
 app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
-  const fid = hub?.interactor?.fid;
+  const fid = hub?.interactor?.fid;  // Detect user's Farcaster ID
 
-  // If the user presses "Enter"
+  // If the user has not pressed the button yet, show the initial frame
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
       image: (
@@ -47,12 +74,12 @@ app.frame('/', async (c) => {
     });
   }
 
+  // If the user pressed the Enter button, check interactions
   if (fid) {
-    // Neynar SDK checks if the user has liked or recasted the cast
-    const hasLiked = await hub.interactor.like({ castId: CAST_ID });
-    const hasRecasted = await hub.interactor.recast({ castId: CAST_ID });
+    const hasInteracted = await checkInteractions(fid);
 
-    if (hasLiked && hasRecasted) {
+    if (hasInteracted) {
+      // If the user has liked, recasted, and followed, show the welcome message
       return c.res({
         image: (
           <div style={{
@@ -73,6 +100,7 @@ app.frame('/', async (c) => {
         ),
       });
     } else {
+      // If the user hasn't liked, recasted, or followed, prompt them to do so
       return c.res({
         image: (
           <div style={{
@@ -88,7 +116,7 @@ app.frame('/', async (c) => {
             position: 'relative',
           }}>
             <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
-              You need to follow, like, and recast first.
+              Please like, recast, and follow to proceed.
             </div>
             <div style={{
               backgroundColor: 'rgba(0, 0, 0, 0.7)',
@@ -99,26 +127,14 @@ app.frame('/', async (c) => {
               padding: '20px',
               borderRadius: '10px',
             }}>
-              <button onClick={async () => {
-                await hub.interactor.like({ castId: CAST_ID });
-                await hub.interactor.recast({ castId: CAST_ID });
-                alert('Liked and Recasted!');  // Temporary confirmation for the user
-              }} style={{
-                color: 'white',
-                background: 'blue',
-                padding: '10px 20px',
-                border: 'none',
-                borderRadius: '5px',
-                cursor: 'pointer'
-              }}>
-                Like and Recast Automatically
-              </button>
+              <Button.Link href={`https://warpcast.com/~/cast/${CAST_ID}`}>Like, Recast, and Follow</Button.Link>
             </div>
           </div>
         ),
       });
     }
   } else {
+    // If the Farcaster ID is not found, show an error message
     return c.res({
       image: <div style={{ color: 'white', fontSize: 60 }}>Error: No Farcaster ID found.</div>
     });
