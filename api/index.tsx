@@ -5,26 +5,23 @@ import { handle } from 'frog/vercel';
 import axios from 'axios';
 import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? 'default-api-key';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
 const CAST_ID = process.env.CAST_ID;
-const FARCASTER_API_URL = 'https://api.farcaster.xyz/v1/reactions';  // Adjust for correct endpoint
+const FARCASTER_REACTIONS_API = `https://api.farcaster.xyz/v1/reactions/${CAST_ID}`;
 
-// Check if the user has liked, recasted, and followed
+// Check if the user has liked and recasted the cast
 async function checkInteractions(fid: string): Promise<boolean> {
   try {
-    const response = await axios.post(FARCASTER_API_URL, {
-      id: {
-        message_id: CAST_ID,
-      },
-      type: 'LIKE',  // or 'RECAST'
-    }, {
+    // Get the reactions for the cast
+    const response = await axios.get(FARCASTER_REACTIONS_API, {
       headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
     });
 
     const reactions = response.data.reactions;
-    const hasLikedOrRecast = reactions.some((reaction: any) => reaction.fid === fid);
+    const hasLiked = reactions.some((reaction: any) => reaction.type === 'LIKE' && reaction.fid === fid);
+    const hasRecasted = reactions.some((reaction: any) => reaction.type === 'RECAST' && reaction.fid === fid);
 
-    return hasLikedOrRecast;  // Check for both likes and recasts
+    return hasLiked && hasRecasted;
   } catch (error) {
     console.error('Error checking reactions:', error);
     return false;
@@ -44,7 +41,6 @@ app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
 
-  // If the user presses "Enter"
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
       image: (
@@ -70,13 +66,12 @@ app.frame('/', async (c) => {
     });
   }
 
-  const fid = hub?.interactor?.fid;  // Get the Farcaster user ID (fid)
+  const fid = hub?.interactor?.fid;
 
   if (fid) {
     const hasInteracted = await checkInteractions(fid);
 
     if (hasInteracted) {
-      // If the user has liked and recasted, show the "Welcome to the POD" message
       return c.res({
         image: (
           <div style={{
@@ -97,7 +92,6 @@ app.frame('/', async (c) => {
         ),
       });
     } else {
-      // Show the overlay/modal if they haven't liked/recasted
       return c.res({
         image: (
           <div style={{
@@ -129,7 +123,7 @@ app.frame('/', async (c) => {
           </div>
         ),
         intents: [
-          <Button value="enter">Try Again</Button>,  // Retry button to check interactions again
+          <Button value="enter">Try Again</Button>,
         ],
       });
     }
