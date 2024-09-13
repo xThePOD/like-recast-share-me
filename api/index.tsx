@@ -5,24 +5,28 @@ import { handle } from 'frog/vercel';
 import axios from 'axios';
 import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? 'default-api-key';
 const CAST_ID = process.env.CAST_ID;
-const FRAME_URL = 'https://like-recast-share-me.vercel.app/api';  // The URL of your embedded frame
-const COMPOSE_URL = `https://warpcast.com/~/compose?text=Check%20out%20this%20awesome%20content!&embeds[]=${FRAME_URL}`;
+const FARCASTER_API_URL = 'https://api.farcaster.xyz/v1/reactions';  // Adjust for correct endpoint
 
-async function checkInteractions(fid: string): Promise<boolean> {
+// Check if the user has liked or recast the cast
+async function checkReactions(fid: string): Promise<boolean> {
   try {
-    const response = await axios.get(`https://api.neynar.com/v2/farcaster/cast?identifier=${CAST_ID}&type=hash`, {
+    const response = await axios.post(FARCASTER_API_URL, {
+      id: {
+        message_id: CAST_ID,
+      },
+      type: 'LIKE',  // or 'RECAST'
+    }, {
       headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
     });
 
-    const cast = response.data.cast;
-    const hasLiked = cast.reactions.likes.some((like: any) => like.fid === fid);
-    const hasRecast = cast.reactions.recasts.some((recast: any) => recast.fid === fid);
+    const reactions = response.data.reactions;
+    const hasLikedOrRecast = reactions.some((reaction: any) => reaction.fid === fid);
 
-    return hasLiked && hasRecast;
+    return hasLikedOrRecast;
   } catch (error) {
-    console.error('Error checking interactions:', error);
+    console.error('Error checking reactions:', error);
     return false;
   }
 }
@@ -30,7 +34,7 @@ async function checkInteractions(fid: string): Promise<boolean> {
 export const app = new Frog({
   assetsPath: '/',
   basePath: '/api',
-  title: 'Two Frame Example with Interaction Gate',
+  title: 'Two Frame Example with Reaction Check',
 }).use(neynar({
   apiKey: NEYNAR_API_KEY,
   features: ['interactor'],
@@ -40,8 +44,7 @@ app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
 
-  // Debugging: Log the full context
-  console.log(c);  // Check if the 'fid' is present in the context
+  const fid = hub?.interactor?.fid;  // Get user fid from context
 
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
@@ -68,13 +71,10 @@ app.frame('/', async (c) => {
     });
   }
 
-  const fid = hub?.interactor?.fid || 'test-fid';  // Fallback for testing purposes
-
   if (fid) {
-    const canEnter = await checkInteractions(fid);
+    const hasReacted = await checkReactions(fid);
 
-    if (canEnter) {
-      // If the user has liked and recasted, show the second frame
+    if (hasReacted) {
       return c.res({
         image: (
           <div style={{
@@ -95,7 +95,6 @@ app.frame('/', async (c) => {
         ),
       });
     } else {
-      // If the user has not liked and recasted, ask them to do so
       return c.res({
         image: (
           <div style={{
@@ -116,8 +115,7 @@ app.frame('/', async (c) => {
         ),
         intents: [
           <Button.Link href={`https://warpcast.com/~/cast/${CAST_ID}`}>Like and Recast</Button.Link>,
-          <Button.Link href={COMPOSE_URL}>Share with Pre-filled Message</Button.Link>,  // Pre-filled composed message button
-          <Button value="enter">Try Again</Button>,  // Retry button to check interactions again
+          <Button value="enter">Try Again</Button>,
         ],
       });
     }
