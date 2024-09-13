@@ -12,7 +12,6 @@ const FARCASTER_REACTIONS_API = `https://api.farcaster.xyz/v1/reactions/${CAST_I
 // Check if the user has liked and recasted the cast
 async function checkInteractions(fid: string): Promise<boolean> {
   try {
-    // Get the reactions for the cast
     const response = await axios.get(FARCASTER_REACTIONS_API, {
       headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
     });
@@ -31,7 +30,7 @@ async function checkInteractions(fid: string): Promise<boolean> {
 export const app = new Frog({
   assetsPath: '/',
   basePath: '/api',
-  title: 'Prompt for Follow, Like, Recast',
+  title: 'Check Reactions Before Welcome',
 }).use(neynar({
   apiKey: NEYNAR_API_KEY,
   features: ['interactor'],
@@ -40,6 +39,9 @@ export const app = new Frog({
 app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
+
+  // Log the full context to check for 'fid'
+  console.log(c);
 
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
@@ -66,7 +68,7 @@ app.frame('/', async (c) => {
     });
   }
 
-  const fid = hub?.interactor?.fid;
+  const fid = hub?.interactor?.fid || 'test-fid';  // Fallback for testing purposes
 
   if (fid) {
     const hasInteracted = await checkInteractions(fid);
