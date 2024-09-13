@@ -5,12 +5,13 @@ import { handle } from 'frog/vercel';
 import { neynar } from 'frog/middlewares';
 
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
-const CAST_ID = process.env.CAST_ID ?? '0x5d38e2845446c8461ed7de820b46b1d0b3b6fad9';
-const USER_FOLLOWER_ID = process.env.FOLLOW_ID ?? '791835';
+const CAST_ID = process.env.CAST_ID ?? '0x5d38e2845446c8461ed7de820b46b1d0b3b6fad9';  // Replace with the correct cast ID
+const USER_FOLLOWER_ID = process.env.FOLLOW_ID ?? '791835';  // Replace with the correct follow ID
 
-// Check if the user has liked, recasted, and followed the cast using Neynar API
+// Function to check if the user has liked, recasted, and followed the cast
 async function checkInteractions(fid: string): Promise<boolean> {
   try {
+    // Check likes and recasts
     const response = await fetch(`https://api.neynar.com/v2/farcaster/cast?identifier=${CAST_ID}&type=hash`, {
       headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
     });
@@ -20,7 +21,7 @@ async function checkInteractions(fid: string): Promise<boolean> {
     const hasLiked = cast.reactions.likes.some((like: any) => like.fid === fid);
     const hasRecasted = cast.reactions.recasts.some((recast: any) => recast.fid === fid);
 
-    // Check if the user follows a certain account (Optional)
+    // Check if the user follows a certain account
     const followResponse = await fetch(`https://api.neynar.com/v2/farcaster/following/${fid}`, {
       headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
     });
@@ -46,7 +47,7 @@ export const app = new Frog({
 app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
-  const fid = hub?.interactor?.fid;  // Detect user's Farcaster ID
+  const fid = hub?.interactor?.fid;  // Detect the user's Farcaster ID
 
   // If the user has not pressed the button yet, show the initial frame
   if (!buttonValue || buttonValue !== 'enter') {
@@ -69,7 +70,7 @@ app.frame('/', async (c) => {
         </div>
       ),
       intents: [
-        <Button value="enter">Enter</Button>,
+        <Button value="enter">Enter</Button>,  // Simple Enter button
       ],
     });
   }
