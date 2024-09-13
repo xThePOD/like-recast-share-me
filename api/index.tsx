@@ -5,11 +5,12 @@ import { handle } from 'frog/vercel';
 import axios from 'axios';
 import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? 'default-api-key';
 const CAST_ID = process.env.CAST_ID;
 const FARCASTER_API_URL = 'https://api.farcaster.xyz/v1/reactions';  // Adjust for correct endpoint
 
-async function checkReactions(fid: string): Promise<boolean> {
+// Check if the user has liked, recasted, and followed
+async function checkInteractions(fid: string): Promise<boolean> {
   try {
     const response = await axios.post(FARCASTER_API_URL, {
       id: {
@@ -23,7 +24,7 @@ async function checkReactions(fid: string): Promise<boolean> {
     const reactions = response.data.reactions;
     const hasLikedOrRecast = reactions.some((reaction: any) => reaction.fid === fid);
 
-    return hasLikedOrRecast;
+    return hasLikedOrRecast;  // Check for both likes and recasts
   } catch (error) {
     console.error('Error checking reactions:', error);
     return false;
@@ -33,7 +34,7 @@ async function checkReactions(fid: string): Promise<boolean> {
 export const app = new Frog({
   assetsPath: '/',
   basePath: '/api',
-  title: 'Check Reactions Before Welcome',
+  title: 'Prompt for Follow, Like, Recast',
 }).use(neynar({
   apiKey: NEYNAR_API_KEY,
   features: ['interactor'],
@@ -43,9 +44,7 @@ app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
 
-  // Debugging: Log the full context
-  console.log(c);  // Check if the 'fid' is present in the context
-
+  // If the user presses "Enter"
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
       image: (
@@ -71,12 +70,12 @@ app.frame('/', async (c) => {
     });
   }
 
-  const fid = hub?.interactor?.fid || 'test-fid';  // Fallback for testing purposes
+  const fid = hub?.interactor?.fid;  // Get the Farcaster user ID (fid)
 
   if (fid) {
-    const hasReacted = await checkReactions(fid);
+    const hasInteracted = await checkInteractions(fid);
 
-    if (hasReacted) {
+    if (hasInteracted) {
       // If the user has liked and recasted, show the "Welcome to the POD" message
       return c.res({
         image: (
@@ -98,7 +97,7 @@ app.frame('/', async (c) => {
         ),
       });
     } else {
-      // If the user hasn't liked and recasted, prompt them to do so
+      // Show the overlay/modal if they haven't liked/recasted
       return c.res({
         image: (
           <div style={{
@@ -111,15 +110,26 @@ app.frame('/', async (c) => {
             justifyContent: 'center',
             textAlign: 'center',
             width: '100%',
+            position: 'relative',
           }}>
             <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
-              Please like and recast the cast to enter!
+              You have to follow, like, and recast first
+            </div>
+            <div style={{
+              backgroundColor: 'rgba(0, 0, 0, 0.7)',
+              position: 'absolute',
+              bottom: 30,
+              left: '50%',
+              transform: 'translateX(-50%)',
+              padding: '20px',
+              borderRadius: '10px',
+            }}>
+              <Button.Link href={`https://warpcast.com/~/cast/${CAST_ID}`}>Follow, Like, and Recast</Button.Link>
             </div>
           </div>
         ),
         intents: [
-          <Button.Link href={`https://warpcast.com/~/cast/${CAST_ID}`}>Like and Recast</Button.Link>,
-          <Button value="enter">Try Again</Button>,  // Retry checking interactions
+          <Button value="enter">Try Again</Button>,  // Retry button to check interactions again
         ],
       });
     }
