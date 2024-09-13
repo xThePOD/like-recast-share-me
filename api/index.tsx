@@ -5,8 +5,10 @@ import { handle } from 'frog/vercel';
 import axios from 'axios';
 import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';  // Ensure apiKey is always a string
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
 const CAST_ID = process.env.CAST_ID;
+const FRAME_URL = 'https://like-recast-share-me.vercel.app/api';  // The URL of your embedded frame
+const COMPOSE_URL = `https://warpcast.com/~/compose?text=Check%20out%20this%20awesome%20content!&embeds[]=${FRAME_URL}`;
 
 async function checkInteractions(fid: string): Promise<boolean> {
   try {
@@ -72,6 +74,7 @@ app.frame('/', async (c) => {
     const canEnter = await checkInteractions(fid);
 
     if (canEnter) {
+      // If the user has liked and recasted, show the second frame
       return c.res({
         image: (
           <div style={{
@@ -92,6 +95,7 @@ app.frame('/', async (c) => {
         ),
       });
     } else {
+      // If the user has not liked and recasted, ask them to do so
       return c.res({
         image: (
           <div style={{
@@ -112,7 +116,8 @@ app.frame('/', async (c) => {
         ),
         intents: [
           <Button.Link href={`https://warpcast.com/~/cast/${CAST_ID}`}>Like and Recast</Button.Link>,
-          <Button value="enter">Try Again</Button>,
+          <Button.Link href={COMPOSE_URL}>Share with Pre-filled Message</Button.Link>,  // Pre-filled composed message button
+          <Button value="enter">Try Again</Button>,  // Retry button to check interactions again
         ],
       });
     }
