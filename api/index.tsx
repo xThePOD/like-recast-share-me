@@ -5,7 +5,7 @@ import { handle } from 'frog/vercel';
 import axios from 'axios';
 import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';  // Ensure apiKey is always a string
 const CAST_ID = process.env.CAST_ID;
 
 async function checkInteractions(fid: string): Promise<boolean> {
@@ -36,7 +36,10 @@ export const app = new Frog({
 
 app.frame('/', async (c) => {
   const { buttonValue } = c;
-  const hub = (c as any).hub;  // TypeScript workaround
+  const hub = (c as any).hub;
+
+  // Debugging: Log the full context
+  console.log(c);  // Check if the 'fid' is present in the context
 
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
@@ -63,7 +66,7 @@ app.frame('/', async (c) => {
     });
   }
 
-  const fid = hub?.interactor?.fid;  // Safe access using type guard
+  const fid = hub?.interactor?.fid || 'test-fid';  // Fallback for testing purposes
 
   if (fid) {
     const canEnter = await checkInteractions(fid);
