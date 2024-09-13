@@ -2,35 +2,36 @@ import { Button, Frog } from 'frog';
 import { devtools } from 'frog/dev';
 import { serveStatic } from 'frog/serve-static';
 import { handle } from 'frog/vercel';
+import { neynar } from 'frog/middlewares';
 
-const WARPCAST_API_KEY = process.env.WARPCAST_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
 const CAST_ID = '0x5d38e284';  // Replace with your actual cast ID
 const FOLLOWEE_ID = '791835';  // Replace with the Farcaster ID of the account to check follow status for
 
-// Function to get reactions (likes or recasts) on a cast
+// Function to get reactions (likes or recasts) on a cast using Neynar API
 async function getReactions(castId: string): Promise<any> {
-  const response = await fetch(`https://api.warpcast.com/v2/reactions?castId=${castId}`, {
-    headers: { 'Authorization': `Bearer ${WARPCAST_API_KEY}` }
+  const response = await fetch(`https://api.neynar.com/v2/farcaster/cast?identifier=${castId}&type=hash`, {
+    headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
   });
   const data = await response.json();
   return data;
 }
 
-// Function to check if a user has liked or recasted a cast
+// Function to check if a user has liked or recasted a cast using Neynar API
 async function hasUserReacted(fid: string, castId: string): Promise<boolean> {
   const reactions = await getReactions(castId);
-  const hasLiked = reactions.likes.some((reaction: any) => reaction.user.fid === fid);
-  const hasRecasted = reactions.recasts.some((reaction: any) => reaction.user.fid === fid);
+  const hasLiked = reactions.cast.reactions.likes.some((like: any) => like.fid === fid);
+  const hasRecasted = reactions.cast.reactions.recasts.some((recast: any) => recast.fid === fid);
   return hasLiked && hasRecasted;
 }
 
-// Function to check if a user follows another user
+// Function to check if a user follows another user using Neynar API
 async function checkFollowStatus(followerFid: string, followeeFid: string): Promise<boolean> {
-  const response = await fetch(`https://api.warpcast.com/v2/follows?followerFid=${followerFid}&followeeFid=${followeeFid}`, {
-    headers: { 'Authorization': `Bearer ${WARPCAST_API_KEY}` }
+  const response = await fetch(`https://api.neynar.com/v2/farcaster/following/${followerFid}`, {
+    headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
   });
   const data = await response.json();
-  return data.isFollowing;
+  return data.following.some((follow: any) => follow.fid === followeeFid);
 }
 
 // Function to check if a user has liked, recasted, and followed
@@ -48,8 +49,11 @@ async function checkInteractions(fid: string): Promise<boolean> {
 export const app = new Frog({
   assetsPath: '/',
   basePath: '/api',
-  title: 'Check Interactions with Warpcast',
-});
+  title: 'Check Interactions with Neynar',
+}).use(neynar({
+  apiKey: NEYNAR_API_KEY,
+  features: ['interactor'],
+}));
 
 app.frame('/', async (c) => {
   const { buttonValue } = c;
