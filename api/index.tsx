@@ -5,7 +5,7 @@ import { handle } from 'frog/vercel';
 import axios from 'axios';
 import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? 'default-api-key';
+const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
 const CAST_ID = process.env.CAST_ID;
 const FARCASTER_API_URL = 'https://api.farcaster.xyz/v1/reactions';  // Adjust for correct endpoint
 
