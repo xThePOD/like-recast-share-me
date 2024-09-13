@@ -5,36 +5,36 @@ import { handle } from 'frog/vercel';
 import { neynar } from 'frog/middlewares';
 
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
-const CAST_ID = '0x5d38e284';  // Replace with your actual cast ID
-const FOLLOWEE_ID = '791835';  // Replace with the Farcaster ID of the account to check follow status for
+const CAST_ID = '0x5d38e284';  // Your actual cast ID
+const FOLLOWEE_ID = '791835';  // Your Farcaster ID
 
-// Function to get reactions (likes or recasts) on a cast using Neynar API
 async function getReactions(castId: string): Promise<any> {
   const response = await fetch(`https://api.neynar.com/v2/farcaster/cast?identifier=${castId}&type=hash`, {
     headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
   });
   const data = await response.json();
+  console.log('Reactions data:', JSON.stringify(data, null, 2));
   return data;
 }
 
-// Function to check if a user has liked or recasted a cast using Neynar API
 async function hasUserReacted(fid: string, castId: string): Promise<boolean> {
   const reactions = await getReactions(castId);
   const hasLiked = reactions.cast.reactions.likes.some((like: any) => like.fid === fid);
   const hasRecasted = reactions.cast.reactions.recasts.some((recast: any) => recast.fid === fid);
+  console.log(`User ${fid} reactions - Liked: ${hasLiked}, Recasted: ${hasRecasted}`);
   return hasLiked && hasRecasted;
 }
 
-// Function to check if a user follows another user using Neynar API
 async function checkFollowStatus(followerFid: string, followeeFid: string): Promise<boolean> {
   const response = await fetch(`https://api.neynar.com/v2/farcaster/following/${followerFid}`, {
     headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
   });
   const data = await response.json();
-  return data.following.some((follow: any) => follow.fid === followeeFid);
+  const isFollowing = data.following.some((follow: any) => follow.fid === followeeFid);
+  console.log(`User ${followerFid} following status for ${followeeFid}: ${isFollowing}`);
+  return isFollowing;
 }
 
-// Function to check if a user has liked, recasted, and followed
 async function checkInteractions(fid: string): Promise<boolean> {
   try {
     const hasReacted = await hasUserReacted(fid, CAST_ID);
@@ -58,7 +58,10 @@ export const app = new Frog({
 app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
-  const fid = hub?.interactor?.fid;  // Get the user's Farcaster ID (fid)
+  const fid = hub?.interactor?.fid;
+
+  console.log('Debug - Full context:', JSON.stringify(c, null, 2));
+  console.log('Debug - FID:', fid);
 
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
@@ -75,17 +78,43 @@ app.frame('/', async (c) => {
           width: '100%',
         }}>
           <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
-            Press Enter
+            Press Enter to Check Interactions
           </div>
         </div>
       ),
       intents: [
-        <Button value="enter">Enter</Button>,  // Simple Enter button
+        <Button value="enter">Enter</Button>,
       ],
     });
   }
 
-  if (fid) {
+  if (!fid) {
+    console.error('No Farcaster ID found in the context');
+    return c.res({
+      image: (
+        <div style={{
+          alignItems: 'center',
+          background: 'linear-gradient(to right, #432889, #17101F)',
+          backgroundSize: '100% 100%',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          justifyContent: 'center',
+          textAlign: 'center',
+          width: '100%',
+        }}>
+          <div style={{ color: 'white', fontSize: 40, marginTop: 30, padding: '0 60px' }}>
+            Error: No Farcaster ID found. Please ensure you're signed in to Farcaster and try again.
+          </div>
+        </div>
+      ),
+      intents: [
+        <Button value="retry">Retry</Button>,
+      ],
+    });
+  }
+
+  try {
     const hasInteracted = await checkInteractions(fid);
 
     if (hasInteracted) {
@@ -121,8 +150,9 @@ app.frame('/', async (c) => {
             justifyContent: 'center',
             textAlign: 'center',
             width: '100%',
+            position: 'relative',
           }}>
-            <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
+            <div style={{ color: 'white', fontSize: 40, marginTop: 30, padding: '0 60px' }}>
               Please like, recast, and follow to proceed.
             </div>
             <div style={{
@@ -138,11 +168,34 @@ app.frame('/', async (c) => {
             </div>
           </div>
         ),
+        intents: [
+          <Button value="enter">Check Again</Button>,
+        ],
       });
     }
-  } else {
+  } catch (error) {
+    console.error('Error in interaction check:', error);
     return c.res({
-      image: <div style={{ color: 'white', fontSize: 60 }}>Error: No Farcaster ID found.</div>
+      image: (
+        <div style={{
+          alignItems: 'center',
+          background: 'linear-gradient(to right, #432889, #17101F)',
+          backgroundSize: '100% 100%',
+          display: 'flex',
+          flexDirection: 'column',
+          height: '100%',
+          justifyContent: 'center',
+          textAlign: 'center',
+          width: '100%',
+        }}>
+          <div style={{ color: 'white', fontSize: 40, marginTop: 30, padding: '0 60px' }}>
+            An error occurred while checking interactions. Please try again.
+          </div>
+        </div>
+      ),
+      intents: [
+        <Button value="retry">Retry</Button>,
+      ],
     });
   }
 });
