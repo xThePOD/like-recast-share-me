@@ -2,33 +2,43 @@ import { Button, Frog } from 'frog';
 import { devtools } from 'frog/dev';
 import { serveStatic } from 'frog/serve-static';
 import { handle } from 'frog/vercel';
-import { neynar } from 'frog/middlewares';
 
-const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
-const CAST_ID = process.env.CAST_ID ?? '0x5d38e2845446c8461ed7de820b46b1d0b3b6fad9';  // Replace with the correct cast ID
-const USER_FOLLOWER_ID = process.env.FOLLOW_ID ?? '791835';  // Replace with the correct follow ID
+const WARPCAST_API_KEY = process.env.WARPCAST_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
+const CAST_ID = '0x5d38e284';  // Replace with your actual cast ID
+const FOLLOWEE_ID = '791835';  // Replace with the Farcaster ID of the account to check follow status for
 
-// Function to check if the user has liked, recasted, and followed the cast
+// Function to get reactions (likes or recasts) on a cast
+async function getReactions(castId: string): Promise<any> {
+  const response = await fetch(`https://api.warpcast.com/v2/reactions?castId=${castId}`, {
+    headers: { 'Authorization': `Bearer ${WARPCAST_API_KEY}` }
+  });
+  const data = await response.json();
+  return data;
+}
+
+// Function to check if a user has liked or recasted a cast
+async function hasUserReacted(fid: string, castId: string): Promise<boolean> {
+  const reactions = await getReactions(castId);
+  const hasLiked = reactions.likes.some((reaction: any) => reaction.user.fid === fid);
+  const hasRecasted = reactions.recasts.some((reaction: any) => reaction.user.fid === fid);
+  return hasLiked && hasRecasted;
+}
+
+// Function to check if a user follows another user
+async function checkFollowStatus(followerFid: string, followeeFid: string): Promise<boolean> {
+  const response = await fetch(`https://api.warpcast.com/v2/follows?followerFid=${followerFid}&followeeFid=${followeeFid}`, {
+    headers: { 'Authorization': `Bearer ${WARPCAST_API_KEY}` }
+  });
+  const data = await response.json();
+  return data.isFollowing;
+}
+
+// Function to check if a user has liked, recasted, and followed
 async function checkInteractions(fid: string): Promise<boolean> {
   try {
-    // Check likes and recasts
-    const response = await fetch(`https://api.neynar.com/v2/farcaster/cast?identifier=${CAST_ID}&type=hash`, {
-      headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
-    });
-    const data = await response.json();
-
-    const cast = data.cast;
-    const hasLiked = cast.reactions.likes.some((like: any) => like.fid === fid);
-    const hasRecasted = cast.reactions.recasts.some((recast: any) => recast.fid === fid);
-
-    // Check if the user follows a certain account
-    const followResponse = await fetch(`https://api.neynar.com/v2/farcaster/following/${fid}`, {
-      headers: { 'Authorization': `Bearer ${NEYNAR_API_KEY}` }
-    });
-    const followData = await followResponse.json();
-    const hasFollowed = followData.following.some((follow: any) => follow.fid === USER_FOLLOWER_ID);
-
-    return hasLiked && hasRecasted && hasFollowed;
+    const hasReacted = await hasUserReacted(fid, CAST_ID);
+    const isFollowing = await checkFollowStatus(fid, FOLLOWEE_ID);
+    return hasReacted && isFollowing;
   } catch (error) {
     console.error('Error checking interactions:', error);
     return false;
@@ -38,18 +48,14 @@ async function checkInteractions(fid: string): Promise<boolean> {
 export const app = new Frog({
   assetsPath: '/',
   basePath: '/api',
-  title: 'Check Interactions and Proceed to Welcome',
-}).use(neynar({
-  apiKey: NEYNAR_API_KEY,
-  features: ['interactor'],
-}));
+  title: 'Check Interactions with Warpcast',
+});
 
 app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
-  const fid = hub?.interactor?.fid;  // Detect the user's Farcaster ID
+  const fid = hub?.interactor?.fid;  // Get the user's Farcaster ID (fid)
 
-  // If the user has not pressed the button yet, show the initial frame
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
       image: (
@@ -75,12 +81,10 @@ app.frame('/', async (c) => {
     });
   }
 
-  // If the user pressed the Enter button, check interactions
   if (fid) {
     const hasInteracted = await checkInteractions(fid);
 
     if (hasInteracted) {
-      // If the user has liked, recasted, and followed, show the welcome message
       return c.res({
         image: (
           <div style={{
@@ -101,7 +105,6 @@ app.frame('/', async (c) => {
         ),
       });
     } else {
-      // If the user hasn't liked, recasted, or followed, prompt them to do so
       return c.res({
         image: (
           <div style={{
@@ -114,7 +117,6 @@ app.frame('/', async (c) => {
             justifyContent: 'center',
             textAlign: 'center',
             width: '100%',
-            position: 'relative',
           }}>
             <div style={{ color: 'white', fontSize: 60, marginTop: 30, padding: '0 120px' }}>
               Please like, recast, and follow to proceed.
@@ -135,7 +137,6 @@ app.frame('/', async (c) => {
       });
     }
   } else {
-    // If the Farcaster ID is not found, show an error message
     return c.res({
       image: <div style={{ color: 'white', fontSize: 60 }}>Error: No Farcaster ID found.</div>
     });
