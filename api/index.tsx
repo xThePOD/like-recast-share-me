@@ -9,7 +9,6 @@ const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36
 const CAST_ID = process.env.CAST_ID;
 const FARCASTER_API_URL = 'https://api.farcaster.xyz/v1/reactions';  // Adjust for correct endpoint
 
-// Check if the user has liked and recasted the cast
 async function checkReactions(fid: string): Promise<boolean> {
   try {
     const response = await axios.post(FARCASTER_API_URL, {
@@ -44,7 +43,9 @@ app.frame('/', async (c) => {
   const { buttonValue } = c;
   const hub = (c as any).hub;
 
-  // If the user presses "Enter"
+  // Debugging: Log the full context
+  console.log(c);  // Check if the 'fid' is present in the context
+
   if (!buttonValue || buttonValue !== 'enter') {
     return c.res({
       image: (
@@ -70,7 +71,7 @@ app.frame('/', async (c) => {
     });
   }
 
-  const fid = hub?.interactor?.fid;  // Get the Farcaster user ID (fid)
+  const fid = hub?.interactor?.fid || 'test-fid';  // Fallback for testing purposes
 
   if (fid) {
     const hasReacted = await checkReactions(fid);
