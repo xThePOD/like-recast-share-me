@@ -5,8 +5,8 @@ import { handle } from 'frog/vercel';
 import { neynar } from 'frog/middlewares';
 
 const NEYNAR_API_KEY = process.env.NEYNAR_API_KEY ?? '0D6B6425-87D9-4548-95A2-36D107C12421';
-const CAST_ID = process.env.CAST_ID ?? 'your-cast-id';
-const USER_FOLLOWER_ID = process.env.FOLLOW_ID ?? 'your-follow-id';
+const CAST_ID = process.env.CAST_ID ?? '0x5d38e284';
+const USER_FOLLOWER_ID = process.env.FOLLOW_ID ?? '791835';
 
 // Check if the user has liked, recasted, and followed the cast using Neynar API
 async function checkInteractions(fid: string): Promise<boolean> {
